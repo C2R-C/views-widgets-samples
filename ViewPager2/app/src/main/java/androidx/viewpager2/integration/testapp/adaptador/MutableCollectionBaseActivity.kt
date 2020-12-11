@@ -16,14 +16,9 @@
 
 package androidx.viewpager2.integration.testapp.adaptador
 
-import android.os.Build
 import android.os.Bundle
-import android.view.View
-import android.view.ViewGroup
-import android.widget.*
 import androidx.activity.viewModels
 import androidx.fragment.app.FragmentActivity
-import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.integration.testapp.R
 import androidx.viewpager2.integration.testapp.viewmodel.ItemsViewModel
@@ -33,93 +28,18 @@ import androidx.viewpager2.widget.ViewPager2
  * Shows how to use notifyDataSetChanged with [ViewPager2]
  */
 abstract class MutableCollectionBaseActivity : FragmentActivity() {
-    private lateinit var buttonAddAfter: Button
-    private lateinit var buttonAddBefore: Button
-    private lateinit var buttonGoTo: Button
-    private lateinit var buttonRemove: Button
-    private lateinit var itemSpinner: Spinner
-    private lateinit var checkboxDiffUtil: CheckBox
     private lateinit var viewPager: ViewPager2
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_mutable_collection)
 
-        buttonAddAfter = findViewById(R.id.buttonAddAfter)
-        buttonAddBefore = findViewById(R.id.buttonAddBefore)
-        buttonGoTo = findViewById(R.id.buttonGoTo)
-        buttonRemove = findViewById(R.id.buttonRemove)
-        itemSpinner = findViewById(R.id.itemSpinner)
-        checkboxDiffUtil = findViewById(R.id.useDiffUtil)
         viewPager = findViewById(R.id.viewPager)
 
         viewPager.adapter = createViewPagerAdapter()
 
-        itemSpinner.adapter = object : BaseAdapter() {
-            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
-                ((convertView as TextView?) ?: TextView(parent.context)).apply {
-                    if (Build.VERSION.SDK_INT >= 17) {
-                        textDirection = View.TEXT_DIRECTION_LOCALE
-                    }
-                    text = getItem(position)
-                }
-
-            override fun getItem(position: Int): String = items.getItemById(getItemId(position))
-            override fun getItemId(position: Int): Long = items.itemId(position)
-            override fun getCount(): Int = items.size
-        }
-
-        buttonGoTo.setOnClickListener {
-            viewPager.setCurrentItem(itemSpinner.selectedItemPosition, true)
-        }
-
-        fun changeDataSet(performChanges: () -> Unit) {
-            if (checkboxDiffUtil.isChecked) {
-                /** using [DiffUtil] */
-                val idsOld = items.createIdSnapshot()
-                performChanges()
-                val idsNew = items.createIdSnapshot()
-                DiffUtil.calculateDiff(object : DiffUtil.Callback() {
-                    override fun getOldListSize(): Int = idsOld.size
-                    override fun getNewListSize(): Int = idsNew.size
-
-                    override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int) =
-                        idsOld[oldItemPosition] == idsNew[newItemPosition]
-
-                    override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int) =
-                        areItemsTheSame(oldItemPosition, newItemPosition)
-                }, true).dispatchUpdatesTo(viewPager.adapter!!)
-            } else {
-                /** without [DiffUtil] */
-                val oldPosition = viewPager.currentItem
-                val currentItemId = items.itemId(oldPosition)
-                performChanges()
-                viewPager.adapter!!.notifyDataSetChanged()
-                if (items.contains(currentItemId)) {
-                    val newPosition =
-                        (0 until items.size).indexOfFirst { items.itemId(it) == currentItemId }
-                    viewPager.setCurrentItem(newPosition, false)
-                }
-            }
-
-            // item spinner update
-            (itemSpinner.adapter as BaseAdapter).notifyDataSetChanged()
-        }
-
-        buttonRemove.setOnClickListener {
-            changeDataSet { items.removeAt(itemSpinner.selectedItemPosition) }
-        }
-
-        buttonAddBefore.setOnClickListener {
-            changeDataSet { items.addNewAt(itemSpinner.selectedItemPosition) }
-        }
-
-        buttonAddAfter.setOnClickListener {
-            changeDataSet { items.addNewAt(itemSpinner.selectedItemPosition + 1) }
-        }
     }
 
     abstract fun createViewPagerAdapter(): RecyclerView.Adapter<*>
-
     val items: ItemsViewModel by viewModels()
 }
